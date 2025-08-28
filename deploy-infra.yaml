@@ -1,0 +1,65 @@
+name: Deploy Infra
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  terraform:
+    name: Terraform Deploy
+    runs-on: ubuntu-latest
+
+    permissions:
+      id-token: write   # Required for OIDC
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Configure AWS credentials (OIDC recommended)
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::786193448664:role/github.cpms.admin
+          aws-region: us-east-1
+
+      # If not using OIDC, uncomment below and set secrets in repo
+      # - name: Configure AWS credentials (using secrets)
+      #   uses: aws-actions/configure-aws-credentials@v4
+      #   with:
+      #     aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      #     aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      #     aws-region: us-east-1
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Init
+        working-directory: cpms-aws/terraform
+        run: terraform init
+
+      - name: Terraform Validate
+        working-directory: cpms-aws/terraform
+        run: terraform validate
+
+      - name: Terraform Plan
+        working-directory: cpms-aws/terraform
+        run: terraform plan -out=tfplan
+
+      # - name: Terraform Apply
+      #   if: github.ref == 'refs/heads/main'
+      #   working-directory: cpms-aws/terraform
+      #   run: terraform apply -auto-approve tfplan
+
+      # Optionally, output EKS cluster info for downstream jobs
+      # - name: Terraform Output
+      #   working-directory: cpms-aws/terraform
+      #   run: terraform output -json > tf_outputs.json
+
+      # - name: Upload Terraform Outputs
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: tf-outputs
+      #     path: cpms-aws/terraform/tf_outputs.json
