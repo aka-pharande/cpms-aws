@@ -55,6 +55,70 @@ module "vpc" {
   })
 }
 
+# Generate a random password for the RDS master user
+resource "random_password" "rds_master" {
+  length  = 16
+  special = true
+}
+
+# Security group for RDS allowing MySQL from EKS nodes
+resource "aws_security_group" "rds" {
+  name        = "sg-${local.base_name}-rds"
+  description = "Allow MySQL from EKS nodes"
+  vpc_id      = module.vpc.vpc_id
+
+  ingress {
+    description      = "MySQL from EKS nodes"
+    from_port        = 3306
+    to_port          = 3306
+    protocol         = "tcp"
+    security_groups  = [module.eks.node_security_group_id]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = merge(var.tags, {
+    Name = "sg-${local.base_name}-rds"
+  })
+}
+
+module "db" {
+  source  = "terraform-aws-modules/rds/aws"
+  version = "6.12.0"
+
+  identifier = "rds-${local.base_name}"
+
+  engine            = "mysql"
+  engine_version    = "8.0"
+  instance_class    = "db.t4g.micro"
+  allocated_storage = 50
+
+  username = "admin"
+  password = random_password.rds_master.result
+  port     = 3306
+
+  multi_az                        = false
+  monitoring_interval             = 0
+  publicly_accessible             = true
+  deletion_protection             = false
+
+  vpc_security_group_ids = [aws_security_group.rds.id]
+
+  db_subnet_group_name = module.vpc.database_subnet_group
+
+  # Optionally, you can use the private subnets for DB if you want to restrict public access
+  # subnet_ids = module.vpc.private_subnets
+
+  tags = merge(var.tags, {
+    Name = "rds-${local.base_name}"
+  })
+}
+
 # EKS Module
 module "eks" {
   source  = "terraform-aws-modules/eks/aws"
