@@ -19,6 +19,12 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::786193448664:role/github.cpms.admin
+          aws-region: us-east-1
+
       - name: Download Terraform Outputs from S3
         run: |
           aws s3 cp s3://s3-cpms-state-dev-useast1/cpms/tf_outputs.json tf-outputs/tf_outputs.json
@@ -30,12 +36,6 @@ jobs:
           REGION=$(jq -r '.eks_cluster_region.value' tf-outputs/tf_outputs.json)
           echo "CLUSTER_NAME=$CLUSTER_NAME" >> $GITHUB_ENV
           echo "REGION=$REGION" >> $GITHUB_ENV
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: arn:aws:iam::786193448664:role/github.cpms.admin
-          aws-region: us-east-1
 
       - name: Install kubectl
         uses: azure/setup-kubectl@v4
