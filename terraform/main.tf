@@ -65,14 +65,14 @@ module "vpc" {
 
 # Generate a random password for the RDS master user
 resource "random_password" "rds_master" {
-  length  = 16
+  length  = 24
   special = true
 }
 
 # Generate a random password for the RDS master user
 resource "random_password" "rds_devuser" {
-  length  = 16
-  special = true
+  length  = 24
+  special = false
 }
 
 # Security group for RDS allowing MySQL from EKS nodes
