@@ -135,7 +135,7 @@ module "db" {
 # EKS Module
 module "eks" {
   source  = "terraform-aws-modules/eks/aws"
-  version = "21.0"
+  version = "21.0.8"
 
   name               = local.cluster_name
   kubernetes_version = var.kubernetes_version
@@ -146,35 +146,10 @@ module "eks" {
 
   vpc_id     = module.vpc.vpc_id
   subnet_ids = module.vpc.private_subnets
-  control_plane_subnet_ids = module.vpc.private_subnets
 
   compute_config = {
-    enabled    = false
-  }
-
-  addons = var.eks_addons
-
-  eks_managed_node_groups = {
-    main = {
-      name           = local.node_group_name
-      iam_role_use_name_prefix = false
-      instance_types = var.node_instance_types
-
-      min_size     = var.node_min_size
-      max_size     = var.node_max_size
-      desired_size = var.node_desired_size
-
-      disk_size = var.node_disk_size
-      ami_type  = var.node_ami_type
-  
-      labels = {
-        role = "main"
-      }
-
-      tags = merge(var.tags, {
-        Name = local.node_group_name
-      })
-    }
+    enabled    = true
+    node_pools = ["general-purpose", "system"]
   }
 
   access_entries = {
