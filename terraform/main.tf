@@ -10,7 +10,7 @@ data "aws_availability_zones" "available" {
 locals {
   # Convert AWS region by dropping hyphens
   region_code = replace(var.aws_region, "-", "")
-  azs      = slice(data.aws_availability_zones.available.names, 0, 3)
+  # azs      = slice(data.aws_availability_zones.available.names, 0, 3)
 
   # Build naming components conditionally
   component_part = var.component_name != "" ? "-${var.component_name}" : ""
@@ -32,13 +32,14 @@ module "vpc" {
   name = local.vpc_name
   cidr = var.network_config.vpc_cidr
 
-  # azs             = slice(data.aws_availability_zones.available.names, 0, var.availability_zones_count)
-  # private_subnets = var.network_config.private_subnets
-  # public_subnets  = var.network_config.public_subnets
+  azs             = slice(data.aws_availability_zones.available.names, 0, var.availability_zones_count)
+  private_subnets = var.network_config.private_subnets
+  public_subnets  = var.network_config.public_subnets
+  database_subnets= var.network_config.public_subnets
 
-  public_subnets   = [for k, v in local.azs : cidrsubnet(var.network_config.vpc_cidr, 8, k)]
-  private_subnets  = [for k, v in local.azs : cidrsubnet(var.network_config.vpc_cidr, 8, k + 3)]
-  database_subnets = [for k, v in local.azs : cidrsubnet(var.network_config.vpc_cidr, 8, k + 6)]
+  # public_subnets   = [for k, v in local.azs : cidrsubnet(var.network_config.vpc_cidr, 8, k)]
+  # private_subnets  = [for k, v in local.azs : cidrsubnet(var.network_config.vpc_cidr, 8, k + 3)]
+  # database_subnets = [for k, v in local.azs : cidrsubnet(var.network_config.vpc_cidr, 8, k + 6)]
 
   enable_nat_gateway   = var.enable_nat_gateway
   enable_dns_hostnames = var.enable_dns_hostnames
