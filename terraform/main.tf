@@ -35,7 +35,7 @@ module "vpc" {
   azs             = slice(data.aws_availability_zones.available.names, 0, var.availability_zones_count)
   private_subnets = var.network_config.private_subnets
   public_subnets  = var.network_config.public_subnets
-  database_subnets= var.network_config.public_subnets
+  database_subnets= var.network_config.database_subnets
 
   # public_subnets   = [for k, v in local.azs : cidrsubnet(var.network_config.vpc_cidr, 8, k)]
   # private_subnets  = [for k, v in local.azs : cidrsubnet(var.network_config.vpc_cidr, 8, k + 3)]
