@@ -1,0 +1,233 @@
+# ========================
+# 1. Employee Service
+# ========================
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cpms-employees
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cpms-employees
+  template:
+    metadata:
+      labels:
+        app: cpms-employees
+    spec:
+      containers:
+        - name: cpms-employees
+          image: akapharande/cpms-employees:1.0
+          ports:
+            - containerPort: 6000
+          envFrom:
+            - secretRef:
+                name: cpms-db-secret
+          resources:
+            requests:
+              cpu: "200m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cpms-employees
+spec:
+  selector:
+    app: cpms-employees
+  ports:
+    - protocol: TCP
+      port: 6000
+      targetPort: 6000
+
+# ========================
+# 2. Hospital Service
+# ========================
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cpms-hospitals
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cpms-hospitals
+  template:
+    metadata:
+      labels:
+        app: cpms-hospitals
+    spec:
+      containers:
+        - name: cpms-hospitals
+          image: akapharande/cpms-hospitals:1.0
+          ports:
+            - containerPort: 5000
+          envFrom:
+            - secretRef:
+                name: cpms-db-secret
+          resources:
+            requests:
+              cpu: "200m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cpms-hospitals
+spec:
+  selector:
+    app: cpms-hospitals
+  ports:
+    - protocol: TCP
+      port: 5000
+      targetPort: 5000
+
+# ========================
+# 3. Authentication Service
+# ========================
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cpms-auth
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cpms-auth
+  template:
+    metadata:
+      labels:
+        app: cpms-auth
+    spec:
+      containers:
+        - name: cpms-auth
+          image: akapharande/cpms-auth:1.1
+          ports:
+            - containerPort: 5050
+          envFrom:
+            - secretRef:
+                name: cpms-db-secret
+          resources:
+            requests:
+              cpu: "200m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cpms-auth
+spec:
+  selector:
+    app: cpms-auth
+  ports:
+    - protocol: TCP
+      port: 5050
+      targetPort: 5050
+
+# ========================
+# 4. Patient Service
+# ========================
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cpms-patients
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cpms-patients
+  template:
+    metadata:
+      labels:
+        app: cpms-patients
+    spec:
+      containers:
+        - name: cpms-patients
+          image: akapharande/cpms-patients:1.0
+          ports:
+            - containerPort: 3000
+          envFrom:
+            - secretRef:
+                name: cpms-db-secret
+            - secretRef:
+                name: cpms-patients-secret
+          resources:
+            requests:
+              cpu: "200m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cpms-patients
+spec:
+  selector:
+    app: cpms-patients
+  ports:
+    - protocol: TCP
+      port: 3000
+      targetPort: 3000
+
+# ========================
+# 7. Frontend UI Service
+# ========================
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cpms-ui
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cpms-ui
+  template:
+    metadata:
+      labels:
+        app: cpms-ui
+    spec:
+      containers:
+        - name: cpms-ui
+          image: akapharande/cpms-ui:1.2
+          ports:
+            - containerPort: 5173
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "300m"
+              memory: "256Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cpms-ui
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+    service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: "ip"
+    service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"
+spec:
+  selector:
+    app: cpms-ui
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 5173
+  type: LoadBalancer
