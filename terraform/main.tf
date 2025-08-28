@@ -135,7 +135,7 @@ module "db" {
 # EKS Module
 module "eks" {
   source  = "terraform-aws-modules/eks/aws"
-  version = "21.0.8"
+  version = "21.0"
 
   name               = local.cluster_name
   kubernetes_version = var.kubernetes_version
@@ -148,13 +148,12 @@ module "eks" {
   subnet_ids = module.vpc.private_subnets
   control_plane_subnet_ids = module.vpc.private_subnets
 
-  # compute_config = {
-  #   enabled    = true
-  #   node_pools = ["general-purpose", "system"]
-  # }
+  compute_config = {
+    enabled    = false
+  }
 
   addons = var.eks_addons
-  
+
   eks_managed_node_groups = {
     main = {
       name           = local.node_group_name
