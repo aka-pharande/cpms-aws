@@ -1,0 +1,86 @@
+name: Deploy App
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'k8s/**'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download Terraform Outputs
+        uses: actions/download-artifact@v4
+        with:
+          name: tf-outputs
+          path: tf-outputs
+
+      - name: Parse Terraform Outputs
+        id: parse
+        run: |
+          CLUSTER_NAME=$(jq -r '.eks_cluster_name.value' tf-outputs/tf_outputs.json)
+          REGION=$(jq -r '.eks_cluster_region.value' tf-outputs/tf_outputs.json)
+          echo "CLUSTER_NAME=$CLUSTER_NAME" >> $GITHUB_ENV
+          echo "REGION=$REGION" >> $GITHUB_ENV
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::786193448664:role/github.cpms.admin
+          aws-region: ${{ env.REGION }}
+
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: 'latest'
+
+      - name: Install jq
+        run: sudo apt-get install -y jq
+
+      - name: Update kubeconfig
+        run: aws eks --region $REGION update-kubeconfig --name $CLUSTER_NAME
+
+      # 1. Deploy Secret
+      - name: Deploy Secret
+        run: kubectl apply -f k8s/cpms-secret.yaml
+
+      # 2. Deploy DB (separate stage for easy removal later)
+      - name: Deploy DB
+        run: kubectl apply -f k8s/cpms-db.yaml
+
+      # 3. Wait for DB to be ready
+      - name: Wait for DB to initialize
+        run: sleep 90
+
+      # 4. Deploy Services
+      - name: Deploy Services
+        run: kubectl apply -f k8s/cpms-services.yaml
+
+      # 5. Get cpms-ui LoadBalancer IP/Hostname
+      - name: Get cpms-ui Service Endpoint
+        id: get-lb
+        run: |
+          # Try to get external IP, fallback to hostname
+          IP=$(kubectl get svc cpms-ui -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+          HOSTNAME=$(kubectl get svc cpms-ui -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+          if [ -n "$IP" ]; then
+            echo "LB_ENDPOINT=$IP" >> $GITHUB_ENV
+            echo "Public IP: $IP"
+          else
+            echo "LB_ENDPOINT=$HOSTNAME" >> $GITHUB_ENV
+            echo "Public Hostname: $HOSTNAME"
+          fi
+
+      - name: Output LoadBalancer Endpoint
+        run: |
+            echo "cpms-ui LoadBalancer endpoint: $LB_ENDPOINT"
