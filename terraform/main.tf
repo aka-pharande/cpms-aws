@@ -39,6 +39,10 @@ module "vpc" {
   enable_dns_hostnames = var.enable_dns_hostnames
   enable_dns_support   = var.enable_dns_support
 
+  create_database_subnet_group           = true
+  create_database_subnet_route_table     = true
+  create_database_internet_gateway_route = true
+
   # Required for EKS
   public_subnet_tags = {
     "kubernetes.io/role/elb" = 1
