@@ -5,9 +5,13 @@ terraform {
       source  = "hashicorp/aws"
       version = "~> 6.0"
     }
-    mysql = {
-      source  = "terraform-providers/mysql"
-      version = "~> 1.9"
+    kubernetes = {
+      source  = "hashicorp/kubernetes"
+      version = "~> 2.23"
+    }
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.1"
     }
   }
 }
