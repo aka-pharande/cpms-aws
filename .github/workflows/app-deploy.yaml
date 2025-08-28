@@ -19,11 +19,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Download Terraform Outputs
-        uses: actions/download-artifact@v4
-        with:
-          name: tf-outputs
-          path: tf-outputs
+      - name: Download Terraform Outputs from S3
+        run: |
+          aws s3 cp s3://s3-cpms-state-dev-useast1/cpms/tf_outputs.json tf-outputs/tf_outputs.json
 
       - name: Parse Terraform Outputs
         id: parse
@@ -37,7 +35,7 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::786193448664:role/github.cpms.admin
-          aws-region: ${{ env.REGION }}
+          aws-region: us-east-1
 
       - name: Install kubectl
         uses: azure/setup-kubectl@v4
