@@ -77,7 +77,7 @@ module "eks" {
 
   access_entries = {
     aakanksha-admin = {
-      principal_arn     = "arn:aws:iam::786193448664:role/aakankshaph"
+      principal_arn     = "arn:aws:iam::786193448664:user/aakankshaph"
       policy_associations = {
         example = {
           policy_arn = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSAdminPolicy"
