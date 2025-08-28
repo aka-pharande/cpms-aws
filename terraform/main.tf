@@ -63,7 +63,7 @@ resource "random_password" "rds_master" {
 
 # Security group for RDS allowing MySQL from EKS nodes
 resource "aws_security_group" "rds" {
-  name        = "sg-${local.base_name}-rds"
+  name        = "SG-${local.base_name}-rds"
   description = "Allow MySQL from EKS nodes"
   vpc_id      = module.vpc.vpc_id
 
@@ -94,7 +94,8 @@ module "db" {
   identifier = "rds-${local.base_name}"
 
   engine            = "mysql"
-  engine_version    = "8.0"
+  family            = "mysql8.0"
+  major_engine_version = "8.0"
   instance_class    = "db.t4g.micro"
   allocated_storage = 50
 
