@@ -10,7 +10,8 @@ data "aws_availability_zones" "available" {
 locals {
   # Convert AWS region by dropping hyphens
   region_code = replace(var.aws_region, "-", "")
-  # azs      = slice(data.aws_availability_zones.available.names, 0, 3)
+  rds_devuser = "devuser"
+  rds_dbname  = "HospitalManagement"
 
   # Build naming components conditionally
   component_part = var.component_name != "" ? "-${var.component_name}" : ""
@@ -36,10 +37,6 @@ module "vpc" {
   private_subnets = var.network_config.private_subnets
   public_subnets  = var.network_config.public_subnets
   database_subnets= var.network_config.database_subnets
-
-  # public_subnets   = [for k, v in local.azs : cidrsubnet(var.network_config.vpc_cidr, 8, k)]
-  # private_subnets  = [for k, v in local.azs : cidrsubnet(var.network_config.vpc_cidr, 8, k + 3)]
-  # database_subnets = [for k, v in local.azs : cidrsubnet(var.network_config.vpc_cidr, 8, k + 6)]
 
   enable_nat_gateway   = var.enable_nat_gateway
   enable_dns_hostnames = var.enable_dns_hostnames
@@ -67,6 +64,12 @@ module "vpc" {
 
 # Generate a random password for the RDS master user
 resource "random_password" "rds_master" {
+  length  = 16
+  special = true
+}
+
+# Generate a random password for the RDS master user
+resource "random_password" "rds_devuser" {
   length  = 16
   special = true
 }
@@ -164,4 +167,47 @@ module "eks" {
   tags = merge(var.tags, {
     Name = local.cluster_name
   })
+}
+
+provider "mysql" {
+  endpoint = "${module.db.db_instance_address}:3306"
+  username = "admin"
+  password = random_password.rds_master.result
+  tls      = false # Set to true if using SSL, false for default RDS config
+}
+
+resource "null_resource" "apply_schema" {
+  provisioner "local-exec" {
+    command = <<EOT
+      mysql --host=${module.db.db_instance_address} \
+            --user=admin \
+            --password='${random_password.rds_master.result}' \
+            ${local.rds_dbname} < ${path.module}/scripts/schema.sql
+    EOT
+  }
+}
+
+resource "null_resource" "apply_dummy_data" {
+  depends_on = [null_resource.apply_schema]
+  provisioner "local-exec" {
+    command = <<EOT
+      mysql --host=${module.db.db_instance_address} \
+            --user=admin \
+            --password='${random_password.rds_master.result}' \
+            ${local.rds_dbname} < ${path.module}/scripts/dummy_data.sql
+    EOT
+  }
+}
+
+resource "mysql_user" "devuser" {
+  user               = local.rds_devuser
+  host               = "%"
+  plaintext_password = random_password.rds_devuser.result
+}
+
+resource "mysql_grant" "devuser_grant" {
+  user       = mysql_user.devuser.user
+  host       = mysql_user.devuser.host
+  database   = local.rds_dbname
+  privileges = ["ALL"]
 }
