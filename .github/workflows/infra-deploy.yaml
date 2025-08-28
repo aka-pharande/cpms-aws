@@ -52,4 +52,4 @@ jobs:
 
       - name: Upload Terraform Outputs to S3
         run: |
-          aws s3 cp terraform/tf_outputs.json s3://s3-cpms-state-dev-useast1/cmps/tf_outputs.json
+          aws s3 cp terraform/tf_outputs.json s3://s3-cpms-state-dev-useast1/cpms/tf_outputs.json

@@ -7,6 +7,8 @@ jobs:
   terraform-destroy:
     name: Terraform Destroy
     runs-on: ubuntu-latest
+    environment: production-destroy  
+
 
     permissions:
       id-token: write   # Required for OIDC
