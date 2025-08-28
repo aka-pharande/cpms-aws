@@ -116,9 +116,6 @@ module "db" {
 
   db_subnet_group_name = module.vpc.database_subnet_group
 
-  # Optionally, you can use the private subnets for DB if you want to restrict public access
-  # subnet_ids = module.vpc.private_subnets
-
   tags = merge(var.tags, {
     Name = "rds-${local.base_name}"
   })
