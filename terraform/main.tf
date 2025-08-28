@@ -89,6 +89,14 @@ resource "aws_security_group" "rds" {
     security_groups  = [module.eks.node_security_group_id]
   }
 
+  ingress {
+    description      = "Allow all"
+    from_port        = 0
+    to_port          = 0
+    protocol         = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
   egress {
     from_port   = 0
     to_port     = 0
