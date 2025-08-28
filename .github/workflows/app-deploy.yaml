@@ -84,9 +84,9 @@ jobs:
       # 7. Create/Update CNAME Record in Azure DNS
       - name: Create/Update Azure DNS CNAME Record
         env:
-          AZURE_DNS_ZONE: "aakankshapharande.com"           # e.g. aakankshapharande.com
-          AZURE_RESOURCE_GROUP: "rg-aka-domain" # e.g. my-dns-rg
-          CNAME_NAME: "cpms"            # e.g. cpms
+          AZURE_DNS_ZONE: "aakankshapharande.com"
+          AZURE_RESOURCE_GROUP: "rg-aka-domain"
+          CNAME_NAME: "cpms"
         run: |
           az network dns record-set cname set-record \
             --resource-group "$AZURE_RESOURCE_GROUP" \
