@@ -146,10 +146,36 @@ module "eks" {
 
   vpc_id     = module.vpc.vpc_id
   subnet_ids = module.vpc.private_subnets
+  control_plane_subnet_ids = module.vpc.private_subnets
 
-  compute_config = {
-    enabled    = true
-    node_pools = ["general-purpose", "system"]
+  # compute_config = {
+  #   enabled    = true
+  #   node_pools = ["general-purpose", "system"]
+  # }
+
+  addons = var.eks_addons
+  
+  eks_managed_node_groups = {
+    main = {
+      name           = local.node_group_name
+      iam_role_use_name_prefix = false
+      instance_types = var.node_instance_types
+
+      min_size     = var.node_min_size
+      max_size     = var.node_max_size
+      desired_size = var.node_desired_size
+
+      disk_size = var.node_disk_size
+      ami_type  = var.node_ami_type
+  
+      labels = {
+        role = "main"
+      }
+
+      tags = merge(var.tags, {
+        Name = local.node_group_name
+      })
+    }
   }
 
   access_entries = {
@@ -476,46 +502,3 @@ output "database_connection_info" {
   }
   sensitive = false
 }
-
-# provider "mysql" {
-#   endpoint = "${module.db.db_instance_address}:3306"
-#   username = "admin"
-#   password = random_password.rds_master.result
-#   tls      = false # Set to true if using SSL, false for default RDS config
-# }
-
-# resource "null_resource" "apply_schema" {
-#   provisioner "local-exec" {
-#     command = <<EOT
-#       mysql --host=${module.db.db_instance_address} \
-#             --user=admin \
-#             --password='${random_password.rds_master.result}' \
-#             ${local.rds_dbname} < ${path.module}/scripts/schema.sql
-#     EOT
-#   }
-# }
-
-# resource "null_resource" "apply_dummy_data" {
-#   depends_on = [null_resource.apply_schema]
-#   provisioner "local-exec" {
-#     command = <<EOT
-#       mysql --host=${module.db.db_instance_address} \
-#             --user=admin \
-#             --password='${random_password.rds_master.result}' \
-#             ${local.rds_dbname} < ${path.module}/scripts/dummy_data.sql
-#     EOT
-#   }
-# }
-
-# resource "mysql_user" "devuser" {
-#   user               = local.rds_devuser
-#   host               = "%"
-#   plaintext_password = random_password.rds_devuser.result
-# }
-
-# resource "mysql_grant" "devuser_grant" {
-#   user       = mysql_user.devuser.user
-#   host       = mysql_user.devuser.host
-#   database   = local.rds_dbname
-#   privileges = ["ALL"]
-# }
