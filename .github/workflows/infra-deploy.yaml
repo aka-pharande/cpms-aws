@@ -48,18 +48,17 @@ jobs:
         working-directory: terraform
         run: terraform plan -out=tfplan
 
-      # - name: Terraform Apply
-      #   if: github.ref == 'refs/heads/main'
-      #   working-directory: cpms-aws/terraform
-      #   run: terraform apply -auto-approve tfplan
+      - name: Terraform Apply
+        if: github.ref == 'refs/heads/main'
+        working-directory: terraform
+        run: terraform apply -auto-approve tfplan
 
-      # Optionally, output EKS cluster info for downstream jobs
-      # - name: Terraform Output
-      #   working-directory: cpms-aws/terraform
-      #   run: terraform output -json > tf_outputs.json
+      - name: Terraform Output
+        working-directory: terraform
+        run: terraform output -json > tf_outputs.json
 
-      # - name: Upload Terraform Outputs
-      #   uses: actions/upload-artifact@v4
-      #   with:
-      #     name: tf-outputs
-      #     path: cpms-aws/terraform/tf_outputs.json
+      - name: Upload Terraform Outputs
+        uses: actions/upload-artifact@v4
+        with:
+          name: tf-outputs
+          path: cpms-aws/terraform/tf_outputs.json
