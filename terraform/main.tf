@@ -66,7 +66,7 @@ module "vpc" {
 # Generate a random password for the RDS master user
 resource "random_password" "rds_master" {
   length  = 24
-  special = true
+  special = false
 }
 
 # Generate a random password for the RDS master user
