@@ -72,3 +72,24 @@ jobs:
           HOSTNAME=$(kubectl get svc cpms-ui -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
           echo "LB_ENDPOINT=$HOSTNAME" >> $GITHUB_ENV
           echo "Public Hostname: $HOSTNAME"
+
+      # 6. Azure Login
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      # 7. Create/Update CNAME Record in Azure DNS
+      - name: Create/Update Azure DNS CNAME Record
+        env:
+          AZURE_DNS_ZONE: "aakankshapharande.com"           # e.g. aakankshapharande.com
+          AZURE_RESOURCE_GROUP: "rg-aka-domain" # e.g. my-dns-rg
+          CNAME_NAME: "cpms"            # e.g. cpms
+        run: |
+          az network dns record-set cname set-record \
+            --resource-group "$AZURE_RESOURCE_GROUP" \
+            --zone-name "$AZURE_DNS_ZONE" \
+            --record-set-name "$CNAME_NAME" \
+            --cname "$LB_ENDPOINT"
