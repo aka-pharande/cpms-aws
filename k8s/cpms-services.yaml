@@ -116,6 +116,8 @@ spec:
           envFrom:
             - secretRef:
                 name: cpms-db-secret
+            - secretRef:
+                name: cpms-auth-secret
           resources:
             requests:
               cpu: "200m"
