@@ -71,8 +71,8 @@ variable "network_config" {
   description = "Network configuration object containing VPC and subnet CIDRs"
   type = object({
     vpc_cidr        = string
-    private_subnets = list(string)
-    public_subnets  = list(string)
+    # private_subnets = list(string)
+    # public_subnets  = list(string)
   })
   default = {
     vpc_cidr        = "10.0.0.0/16"
