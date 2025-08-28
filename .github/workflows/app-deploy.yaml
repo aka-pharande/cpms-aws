@@ -48,21 +48,9 @@ jobs:
       - name: Update kubeconfig
         run: aws eks --region $REGION update-kubeconfig --name $CLUSTER_NAME
 
-      # 1. Deploy Secret
-      - name: Deploy Secret
-        run: kubectl apply -f k8s/cpms-secret.yaml
-
-      # 2. Deploy DB (separate stage for easy removal later)
-      - name: Deploy DB
-        run: kubectl apply -f k8s/cpms-db.yaml
-
-      # 3. Wait for DB to be ready
-      - name: Wait for DB to initialize
-        run: sleep 90
-
       # 4. Deploy Services
       - name: Deploy Services
-        run: kubectl apply -f k8s/cpms-services.yaml
+        run: kubectl apply -f k8s/
 
       # 5. Get cpms-ui LoadBalancer IP/Hostname
       - name: Get cpms-ui Service Endpoint
