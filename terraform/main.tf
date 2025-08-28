@@ -146,10 +146,36 @@ module "eks" {
 
   vpc_id     = module.vpc.vpc_id
   subnet_ids = module.vpc.private_subnets
+  control_plane_subnet_ids = module.vpc.private_subnets
 
-  compute_config = {
-    enabled    = true
-    node_pools = ["general-purpose", "system"]
+  # compute_config = {
+  #   enabled    = true
+  #   node_pools = ["general-purpose", "system"]
+  # }
+
+  addons = var.eks_addons
+  
+  eks_managed_node_groups = {
+    main = {
+      name           = local.node_group_name
+      iam_role_use_name_prefix = false
+      instance_types = var.node_instance_types
+
+      min_size     = var.node_min_size
+      max_size     = var.node_max_size
+      desired_size = var.node_desired_size
+
+      disk_size = var.node_disk_size
+      ami_type  = var.node_ami_type
+  
+      labels = {
+        role = "main"
+      }
+
+      tags = merge(var.tags, {
+        Name = local.node_group_name
+      })
+    }
   }
 
   access_entries = {
