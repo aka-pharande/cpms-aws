@@ -86,15 +86,7 @@ resource "aws_security_group" "rds" {
     from_port        = local.rds_dbport
     to_port          = local.rds_dbport
     protocol         = "tcp"
-    security_groups  = [module.eks.node_security_group_id]
-  }
-
-  ingress {
-    description      = "Allow all"
-    from_port        = 0
-    to_port          = 0
-    protocol         = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
+    security_groups  = [module.eks.cluster_primary_security_group_id]
   }
 
   egress {
