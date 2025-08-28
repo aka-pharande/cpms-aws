@@ -116,6 +116,7 @@ module "db" {
   username = "admin"
   password = random_password.rds_master.result
   port     = local.rds_dbport
+  manage_master_user_password = false
 
   multi_az                        = false
   monitoring_interval             = 0
@@ -156,7 +157,7 @@ module "eks" {
       principal_arn     = "arn:aws:iam::786193448664:user/aakankshaph"
       policy_associations = {
         example = {
-          policy_arn = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSAdminPolicy"
+          policy_arn = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
           access_scope = {
             type = "cluster"
           }
