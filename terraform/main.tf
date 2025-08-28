@@ -75,6 +75,20 @@ module "eks" {
     node_pools = ["general-purpose", "system"]
   }
 
+  access_entries = {
+    aakanksha-admin = {
+      principal_arn     = "arn:aws:iam::786193448664:role/aakankshaph"
+      policy_associations = {
+        example = {
+          policy_arn = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSAdminPolicy"
+          access_scope = {
+            type = "Cluster"
+          }
+        }
+      }
+    }
+  }
+
   tags = merge(var.tags, {
     Name = local.cluster_name
   })
