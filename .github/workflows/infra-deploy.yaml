@@ -61,4 +61,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: tf-outputs
-          path: cpms-aws/terraform/tf_outputs.json
+          path: terraform/tf_outputs.json
