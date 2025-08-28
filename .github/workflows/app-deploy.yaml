@@ -69,16 +69,6 @@ jobs:
         id: get-lb
         run: |
           # Try to get external IP, fallback to hostname
-          IP=$(kubectl get svc cpms-ui -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
           HOSTNAME=$(kubectl get svc cpms-ui -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
-          if [ -n "$IP" ]; then
-            echo "LB_ENDPOINT=$IP" >> $GITHUB_ENV
-            echo "Public IP: $IP"
-          else
-            echo "LB_ENDPOINT=$HOSTNAME" >> $GITHUB_ENV
-            echo "Public Hostname: $HOSTNAME"
-          fi
-
-      - name: Output LoadBalancer Endpoint
-        run: |
-            echo "cpms-ui LoadBalancer endpoint: $LB_ENDPOINT"
+          echo "LB_ENDPOINT=$HOSTNAME" >> $GITHUB_ENV
+          echo "Public Hostname: $HOSTNAME"
