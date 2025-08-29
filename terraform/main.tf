@@ -1,4 +1,6 @@
+############################################
 # Data source for availability zones
+############################################
 data "aws_availability_zones" "available" {
   filter {
     name   = "opt-in-status"
@@ -6,7 +8,9 @@ data "aws_availability_zones" "available" {
   }
 }
 
-# Local values for naming convention
+############################################
+# Locals (naming, DB defaults, etc.)
+############################################
 locals {
   # Convert AWS region by dropping hyphens
   region_code = replace(var.aws_region, "-", "")
@@ -26,7 +30,9 @@ locals {
   node_group_name = "ng-${var.product_name}-main${local.instance_part}-${var.environment_kind}-${local.region_code}"
 }
 
-# VPC Module
+############################################
+# VPC
+############################################
 module "vpc" {
   source  = "terraform-aws-modules/vpc/aws"
   version = "6.0.1"
@@ -34,10 +40,10 @@ module "vpc" {
   name = local.vpc_name
   cidr = var.network_config.vpc_cidr
 
-  azs             = slice(data.aws_availability_zones.available.names, 0, var.availability_zones_count)
-  private_subnets = var.network_config.private_subnets
-  public_subnets  = var.network_config.public_subnets
-  database_subnets= var.network_config.database_subnets
+  azs              = slice(data.aws_availability_zones.available.names, 0, var.availability_zones_count)
+  private_subnets  = var.network_config.private_subnets
+  public_subnets   = var.network_config.public_subnets
+  database_subnets = var.network_config.database_subnets
 
   enable_nat_gateway   = var.enable_nat_gateway
   enable_dns_hostnames = var.enable_dns_hostnames
@@ -49,13 +55,13 @@ module "vpc" {
 
   # Required for EKS
   public_subnet_tags = {
-    "kubernetes.io/role/elb" = 1
-    "kubernetes.io/cluster/${local.cluster_name}" = "shared"
+    "kubernetes.io/role/elb"                         = 1
+    "kubernetes.io/cluster/${local.cluster_name}"    = "shared"
   }
 
   private_subnet_tags = {
-    "kubernetes.io/role/internal-elb" = 1
-    "kubernetes.io/cluster/${local.cluster_name}" = "shared"
+    "kubernetes.io/role/internal-elb"                = 1
+    "kubernetes.io/cluster/${local.cluster_name}"    = "shared"
   }
 
   tags = merge(var.tags, {
@@ -63,30 +69,33 @@ module "vpc" {
   })
 }
 
-# Generate a random password for the RDS master user
+############################################
+# Random passwords for RDS users
+############################################
 resource "random_password" "rds_master" {
   length  = 24
   special = false
 }
 
-# Generate a random password for the RDS master user
 resource "random_password" "rds_devuser" {
   length  = 24
   special = false
 }
 
-# Security group for RDS allowing MySQL from EKS nodes
+############################################
+# RDS Security Group (allows EKS nodes)
+############################################
 resource "aws_security_group" "rds" {
   name        = "SG-${local.base_name}-rds"
   description = "Allow MySQL from EKS nodes"
   vpc_id      = module.vpc.vpc_id
 
   ingress {
-    description      = "MySQL from EKS nodes"
-    from_port        = local.rds_dbport
-    to_port          = local.rds_dbport
-    protocol         = "tcp"
-    security_groups  = [module.eks.cluster_primary_security_group_id]
+    description     = "MySQL from EKS nodes"
+    from_port       = local.rds_dbport
+    to_port         = local.rds_dbport
+    protocol        = "tcp"
+    security_groups = [module.eks.cluster_primary_security_group_id]
   }
 
   ingress {
@@ -108,38 +117,42 @@ resource "aws_security_group" "rds" {
   })
 }
 
+############################################
+# RDS (MySQL)
+############################################
 module "db" {
   source  = "terraform-aws-modules/rds/aws"
   version = "6.12.0"
 
   identifier = "rds-${local.base_name}"
 
-  engine            = "mysql"
-  family            = "mysql8.0"
-  major_engine_version = "8.0"
-  instance_class    = "db.t4g.micro"
-  allocated_storage = 50
+  engine                 = "mysql"
+  family                 = "mysql8.0"
+  major_engine_version   = "8.0"
+  instance_class         = "db.t4g.micro"
+  allocated_storage      = 50
 
-  username = "admin"
-  password = random_password.rds_master.result
-  port     = local.rds_dbport
-  manage_master_user_password = false
+  username                      = "admin"
+  password                      = random_password.rds_master.result
+  port                          = local.rds_dbport
+  manage_master_user_password   = false
 
-  multi_az                        = false
-  monitoring_interval             = 0
-  publicly_accessible             = true
-  deletion_protection             = false
+  multi_az            = false
+  monitoring_interval = 0
+  publicly_accessible = true
+  deletion_protection = false
 
   vpc_security_group_ids = [aws_security_group.rds.id]
-
-  db_subnet_group_name = module.vpc.database_subnet_group
+  db_subnet_group_name   = module.vpc.database_subnet_group
 
   tags = merge(var.tags, {
     Name = "rds-${local.base_name}"
   })
 }
 
-# EKS Module
+############################################
+# EKS Cluster (with IRSA enabled)
+############################################
 module "eks" {
   source  = "terraform-aws-modules/eks/aws"
   version = "21.0.8"
@@ -151,8 +164,11 @@ module "eks" {
   endpoint_public_access                   = var.endpoint_public_access
   enable_cluster_creator_admin_permissions = var.enable_cluster_creator_admin_permissions
 
-  vpc_id     = module.vpc.vpc_id
-  subnet_ids = module.vpc.private_subnets
+  # IRSA explicit enablement
+  enable_irsa = true
+
+  vpc_id                   = module.vpc.vpc_id
+  subnet_ids               = module.vpc.private_subnets
   control_plane_subnet_ids = module.vpc.private_subnets
 
   # compute_config = {
@@ -161,12 +177,12 @@ module "eks" {
   # }
 
   addons = var.eks_addons
-  
+
   eks_managed_node_groups = {
     main = {
-      name           = local.node_group_name
-      iam_role_use_name_prefix = false
-      instance_types = var.node_instance_types
+      name                       = local.node_group_name
+      iam_role_use_name_prefix   = false
+      instance_types             = var.node_instance_types
 
       min_size     = var.node_min_size
       max_size     = var.node_max_size
@@ -174,7 +190,7 @@ module "eks" {
 
       disk_size = var.node_disk_size
       ami_type  = var.node_ami_type
-  
+
       labels = {
         role = "main"
       }
@@ -187,7 +203,7 @@ module "eks" {
 
   access_entries = {
     aakanksha-admin = {
-      principal_arn     = "arn:aws:iam::786193448664:user/aakankshaph"
+      principal_arn = "arn:aws:iam::786193448664:user/aakankshaph"
       policy_associations = {
         example = {
           policy_arn = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
@@ -204,12 +220,13 @@ module "eks" {
   })
 }
 
-
-# Configure Kubernetes provider to use EKS cluster
+############################################
+# Kubernetes provider (auth via aws eks get-token)
+############################################
 provider "kubernetes" {
   host                   = module.eks.cluster_endpoint
   cluster_ca_certificate = base64decode(module.eks.cluster_certificate_authority_data)
-  
+
   exec {
     api_version = "client.authentication.k8s.io/v1beta1"
     command     = "aws"
@@ -217,10 +234,174 @@ provider "kubernetes" {
   }
 }
 
-# Create Kubernetes secrets for database credentials
+############################################
+# --- IRSA + S3 for Documents (Integrated) ---
+############################################
+
+# Unique suffix so bucket name is globally unique
+resource "random_id" "s3" {
+  byte_length = 3
+}
+
+# ServiceAccount naming for IRSA
+locals {
+  irsa_sa_namespace = "default"
+  irsa_sa_name      = "s3-reader"
+  s3_bucket_name    = lower("s3-${local.base_name}-${random_id.s3.hex}")
+  s3_bucket_arn     = "arn:aws:s3:::${local.s3_bucket_name}"
+  s3_objects_arn    = "${local.s3_bucket_arn}/*"
+}
+
+# S3 bucket (private, versioned, SSE, public blocked)
+resource "aws_s3_bucket" "docs" {
+  bucket        = local.s3_bucket_name
+  force_destroy = false
+  tags          = merge(var.tags, { Name = local.s3_bucket_name })
+}
+
+resource "aws_s3_bucket_versioning" "docs" {
+  bucket = aws_s3_bucket.docs.id
+  versioning_configuration { status = "Enabled" }
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "docs" {
+  bucket = aws_s3_bucket.docs.id
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "AES256"
+    }
+  }
+}
+
+resource "aws_s3_bucket_ownership_controls" "docs" {
+  bucket = aws_s3_bucket.docs.id
+  rule {
+    object_ownership = "BucketOwnerPreferred"
+  }
+}
+
+resource "aws_s3_bucket_public_access_block" "docs" {
+  bucket                  = aws_s3_bucket.docs.id
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+# IRSA trust policy (restrict to one SA + audience)
+data "aws_iam_policy_document" "s3_irsa_assume_role" {
+  statement {
+    actions = ["sts:AssumeRoleWithWebIdentity"]
+
+    principals {
+      type        = "Federated"
+      identifiers = [module.eks.oidc_provider_arn]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "${replace(module.eks.cluster_oidc_issuer_url, "https://", "")}:sub"
+      values   = ["system:serviceaccount:${local.irsa_sa_namespace}:${local.irsa_sa_name}"]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "${replace(module.eks.cluster_oidc_issuer_url, "https://", "")}:aud"
+      values   = ["sts.amazonaws.com"]
+    }
+  }
+}
+
+# S3 bucket-scoped policy (RW on objects, list bucket)
+data "aws_iam_policy_document" "s3_rw_policy_doc" {
+  statement {
+    sid       = "ListBucket"
+    actions   = ["s3:ListBucket"]
+    resources = [local.s3_bucket_arn]
+  }
+
+  statement {
+    sid       = "RWObjects"
+    actions   = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"]
+    resources = [local.s3_objects_arn]
+  }
+}
+
+resource "aws_iam_policy" "s3_rw_policy" {
+  name        = "irsa-${local.base_name}-s3-rw"
+  description = "IRSA policy for pods to access ${local.s3_bucket_name}"
+  policy      = data.aws_iam_policy_document.s3_rw_policy_doc.json
+  tags        = var.tags
+}
+
+resource "aws_iam_role" "s3_irsa_role" {
+  name               = "irsa-${local.base_name}-s3"
+  assume_role_policy = data.aws_iam_policy_document.s3_irsa_assume_role.json
+  tags               = var.tags
+}
+
+resource "aws_iam_role_policy_attachment" "s3_rw_attach" {
+  role       = aws_iam_role.s3_irsa_role.name
+  policy_arn = aws_iam_policy.s3_rw_policy.arn
+}
+
+# Bucket policy: enforce TLS and allow only IRSA role
+data "aws_iam_policy_document" "bucket_policy" {
+  statement {
+    sid     = "DenyInsecureTransport"
+    effect  = "Deny"
+    actions = ["s3:*"]
+    principals { 
+      identifiers = ["*"]
+      type = "*"
+      }
+    resources = [local.s3_bucket_arn, local.s3_objects_arn]
+    condition {
+      test     = "Bool"
+      variable = "aws:SecureTransport"
+      values   = ["false"]
+    }
+  }
+
+  statement {
+    sid     = "AllowIRSAOnly"
+    effect  = "Allow"
+    actions = ["s3:*"]
+    principals {
+      type        = "AWS"
+      identifiers = [aws_iam_role.s3_irsa_role.arn]
+    }
+    resources = [local.s3_bucket_arn, local.s3_objects_arn]
+  }
+}
+
+resource "aws_s3_bucket_policy" "docs" {
+  bucket = aws_s3_bucket.docs.id
+  policy = data.aws_iam_policy_document.bucket_policy.json
+}
+
+# Kubernetes ServiceAccount annotated with the IRSA role
+resource "kubernetes_service_account" "s3_reader" {
+  depends_on = [module.eks]
+
+  metadata {
+    name      = local.irsa_sa_name
+    namespace = local.irsa_sa_namespace
+    annotations = {
+      "eks.amazonaws.com/role-arn" = aws_iam_role.s3_irsa_role.arn
+    }
+    labels = {
+      "app.kubernetes.io/name" = "s3-reader"
+    }
+  }
+}
+
+############################################
+# Kubernetes Secrets (DB creds + app secrets)
+############################################
 resource "kubernetes_secret" "cpms_db_admin" {
   depends_on = [module.eks]
-  
+
   metadata {
     name      = "cpms-db-admin-secret"
     namespace = "default"
@@ -243,9 +424,9 @@ resource "kubernetes_secret" "cpms_db_admin" {
 
 resource "kubernetes_secret" "cpms_db_secret" {
   depends_on = [module.eks]
-  
+
   metadata {
-    name      = "cpms-db-secret"  # Same name as your original secret
+    name      = "cpms-db-secret"
     namespace = "default"
     labels = {
       "app.kubernetes.io/managed-by" = "terraform"
@@ -264,10 +445,9 @@ resource "kubernetes_secret" "cpms_db_secret" {
   type = "Opaque"
 }
 
-# Your other application secrets (these can stay as-is or also be managed by Terraform)
 resource "kubernetes_secret" "cpms_patients_secret" {
   depends_on = [module.eks]
-  
+
   metadata {
     name      = "cpms-patients-secret"
     namespace = "default"
@@ -277,10 +457,7 @@ resource "kubernetes_secret" "cpms_patients_secret" {
   }
 
   data = {
-    PORT                         = "3000"
-    AZURE_STORAGE_ACCOUNT_NAME   = "stdocumentscpms"
-    AZURE_STORAGE_ACCOUNT_KEY    = "Yxr+yM+3tX3HRWgM3R48Xfu3qbGv8GUajM5gbARpboA/k6M9SKrCO7Akiy+T777FaeUpXTe24+g5+AStRjIzVw=="
-    AZURE_STORAGE_CONTAINER_NAME = "documents"
+    S3_BUCKET_NAME = aws_s3_bucket.docs.bucket
   }
 
   type = "Opaque"
@@ -288,7 +465,7 @@ resource "kubernetes_secret" "cpms_patients_secret" {
 
 resource "kubernetes_secret" "cpms_auth_secret" {
   depends_on = [module.eks]
-  
+
   metadata {
     name      = "cpms-auth-secret"
     namespace = "default"
@@ -304,44 +481,44 @@ resource "kubernetes_secret" "cpms_auth_secret" {
   type = "Opaque"
 }
 
-# ConfigMap with database initialization scripts
+############################################
+# DB Init (ConfigMap + SA + Job)
+############################################
 resource "kubernetes_config_map" "database_init_scripts" {
   depends_on = [module.eks]
-  
+
   metadata {
     name      = "database-init-scripts"
     namespace = "default"
   }
 
   data = {
-    # Your schema.sql already has CREATE DATABASE, so we'll use it directly
     "01-schema.sql" = file("${path.module}/scripts/schema.sql")
-    
+
     "02-create-devuser.sql" = <<-EOT
       USE ${local.rds_dbname};
-      
+
       -- Create devuser with limited privileges
       CREATE USER IF NOT EXISTS '${local.rds_devuser}'@'%' IDENTIFIED BY '${random_password.rds_devuser.result}';
       GRANT SELECT, INSERT, UPDATE, DELETE ON ${local.rds_dbname}.* TO '${local.rds_devuser}'@'%';
-      
+
       -- Grant DDL operations for migrations (CREATE, ALTER, INDEX, DROP)
       GRANT CREATE, ALTER, INDEX, DROP ON ${local.rds_dbname}.* TO '${local.rds_devuser}'@'%';
-      
+
       FLUSH PRIVILEGES;
-      
+
       -- Verify user creation
       SELECT User, Host FROM mysql.user WHERE User = '${local.rds_devuser}';
       SHOW GRANTS FOR '${local.rds_devuser}'@'%';
     EOT
-    
+
     "03-dummy-data.sql" = file("${path.module}/scripts/dummy_data.sql")
   }
 }
 
-# Service account for database initialization job
 resource "kubernetes_service_account" "db_init" {
   depends_on = [module.eks]
-  
+
   metadata {
     name      = "db-init-service-account"
     namespace = "default"
@@ -351,17 +528,16 @@ resource "kubernetes_service_account" "db_init" {
   }
 }
 
-# Database initialization job
 resource "kubernetes_job_v1" "database_init" {
   depends_on = [
     kubernetes_config_map.database_init_scripts,
     kubernetes_secret.cpms_db_admin,
     kubernetes_secret.cpms_db_secret,
-    module.db  # Ensure RDS is ready
+    module.db
   ]
-  
+
   metadata {
-    name      = "database-init-${formatdate("YYYYMMDD-hhmm", timestamp())}"  # Unique name for each run
+    name      = "database-init-${formatdate("YYYYMMDD-hhmm", timestamp())}"
     namespace = "default"
     labels = {
       "app.kubernetes.io/name"       = "database-init"
@@ -369,12 +545,11 @@ resource "kubernetes_job_v1" "database_init" {
       "app.kubernetes.io/managed-by" = "terraform"
     }
   }
-  
+
   spec {
-    # Important: Set to 0 so job doesn't get cleaned up immediately
-    ttl_seconds_after_finished = 3600  # Keep for 1 hour for debugging
-    backoff_limit              = 3     # Retry up to 3 times
-    
+    ttl_seconds_after_finished = 3600
+    backoff_limit              = 3
+
     template {
       metadata {
         labels = {
@@ -382,16 +557,15 @@ resource "kubernetes_job_v1" "database_init" {
           "app.kubernetes.io/component" = "database"
         }
       }
-      
+
       spec {
         restart_policy       = "Never"
         service_account_name = kubernetes_service_account.db_init.metadata[0].name
-        
-        # Wait for database to be ready before starting
+
         init_container {
           name  = "wait-for-db"
           image = "mysql:8.0"
-          
+
           command = [
             "sh", "-c",
             <<-EOT
@@ -403,42 +577,31 @@ resource "kubernetes_job_v1" "database_init" {
             echo "Database is ready!"
             EOT
           ]
-          
+
           env_from {
-            secret_ref {
-              name = kubernetes_secret.cpms_db_admin.metadata[0].name
-            }
+            secret_ref { name = kubernetes_secret.cpms_db_admin.metadata[0].name }
           }
-          
+
           resources {
-            requests = {
-              memory = "64Mi"
-              cpu    = "50m"
-            }
-            limits = {
-              memory = "128Mi"
-              cpu    = "100m"
-            }
+            requests = { memory = "64Mi",  cpu = "50m"  }
+            limits   = { memory = "128Mi", cpu = "100m" }
           }
         }
-        
+
         container {
           name  = "database-setup"
           image = "mysql:8.0"
-          
+
           command = [
             "sh", "-c",
             <<-EOT
             set -e
             echo "Starting database initialization..."
-            
-            # Execute all SQL scripts in order
+
             for script in /scripts/*.sql; do
               script_name=$(basename "$script")
               echo "Executing $script_name..."
-              
               mysql --host=$DB_HOST --port=$DB_PORT --user=$DB_USER --password=$DB_PASS < "$script"
-              
               if [ $? -eq 0 ]; then
                 echo "✓ $script_name completed successfully"
               else
@@ -446,41 +609,30 @@ resource "kubernetes_job_v1" "database_init" {
                 exit 1
               fi
             done
-            
+
             echo "Database initialization completed successfully!"
-            
-            # Test connection with devuser to verify it was created
             echo "Testing devuser connection..."
             mysql --host=$DB_HOST --port=$DB_PORT --user=${local.rds_devuser} --password='${random_password.rds_devuser.result}' --execute="SELECT 'DevUser connection successful' as test;" ${local.rds_dbname}
-            
             echo "All database setup tasks completed!"
             EOT
           ]
-          
+
           env_from {
-            secret_ref {
-              name = kubernetes_secret.cpms_db_admin.metadata[0].name
-            }
+            secret_ref { name = kubernetes_secret.cpms_db_admin.metadata[0].name }
           }
-          
+
           volume_mount {
             name       = "init-scripts"
             mount_path = "/scripts"
             read_only  = true
           }
-          
+
           resources {
-            requests = {
-              memory = "128Mi"
-              cpu    = "100m"
-            }
-            limits = {
-              memory = "256Mi"
-              cpu    = "200m"
-            }
+            requests = { memory = "128Mi", cpu = "100m" }
+            limits   = { memory = "256Mi", cpu = "200m" }
           }
         }
-        
+
         volume {
           name = "init-scripts"
           config_map {
@@ -491,21 +643,4 @@ resource "kubernetes_job_v1" "database_init" {
       }
     }
   }
-}
-
-# Optional: Output the job status for monitoring
-output "database_init_job_name" {
-  description = "Name of the database initialization job"
-  value       = kubernetes_job_v1.database_init.metadata[0].name
-}
-
-output "database_connection_info" {
-  description = "Database connection information"
-  value = {
-    host     = module.db.db_instance_address
-    port     = local.rds_dbport
-    database = local.rds_dbname
-    # Don't output passwords in logs
-  }
-  sensitive = false
 }
