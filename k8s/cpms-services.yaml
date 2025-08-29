@@ -147,7 +147,6 @@ kind: Deployment
 metadata:
   name: cpms-patients
 spec:
-  serviceAccountName: s3-reader
   replicas: 1
   selector:
     matchLabels:
@@ -157,6 +156,7 @@ spec:
       labels:
         app: cpms-patients
     spec:
+      serviceAccountName: s3-reader
       containers:
         - name: cpms-patients
           image: akapharande/cpms-patients:1.1
