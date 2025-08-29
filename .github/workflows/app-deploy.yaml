@@ -27,7 +27,11 @@ jobs:
 
       - name: Download Terraform Outputs from S3
         run: |
+          mkdir -p tf-outputs
           aws s3 cp s3://s3-cpms-state-dev-useast1/cpms/tf_outputs.json tf-outputs/tf_outputs.json
+
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
 
       - name: Parse Terraform Outputs
         id: parse
@@ -42,26 +46,59 @@ jobs:
         with:
           version: 'latest'
 
-      - name: Install jq
-        run: sudo apt-get install -y jq
-
       - name: Update kubeconfig
         run: aws eks --region $REGION update-kubeconfig --name $CLUSTER_NAME
 
-      # 4. Deploy Services
-      - name: Deploy Services
+      # Apply your app Deployments/Services/Ingress
+      - name: Deploy k8s Manifests
         run: kubectl apply -f k8s/
 
-      # 5. Get cpms-ui LoadBalancer IP/Hostname
-      - name: Get cpms-ui Service Endpoint
-        id: get-lb
+      # ---------- Option C: Apply ClusterIssuers via kubectl ----------
+      # Requires a file k8s/le-cluster-issuers.yaml with REPLACE_ME_EMAIL placeholder
+      - name: Apply ClusterIssuers (optional)
+        if: ${{ hashFiles('k8s/le-cluster-issuers.yaml') != '' }}
+        env:
+          ACME_EMAIL: aka.pharande@gmail.com
         run: |
-          # Try to get external IP, fallback to hostname
-          HOSTNAME=$(kubectl get svc cpms-ui -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
-          echo "LB_ENDPOINT=$HOSTNAME" >> $GITHUB_ENV
-          echo "Public Hostname: $HOSTNAME"
+          set -e
+          if [ -z "$ACME_EMAIL" ]; then
+            echo "ACME_EMAIL not set; skipping issuers apply."
+            exit 0
+          fi
+          # give cert-manager CRDs a moment (first-time bootstrap)
+          sleep 15
+          sed "s/REPLACE_ME_EMAIL/${ACME_EMAIL}/g" k8s/le-cluster-issuers.yaml > k8s/le-cluster-issuers.rendered.yaml
+          kubectl apply -f k8s/le-cluster-issuers.rendered.yaml
+          kubectl get clusterissuers
 
-      # 6. Azure Login
+      # Wait for ingress-nginx controller Service to get a hostname
+      - name: Get Ingress Controller Hostname
+        id: ingress-lb
+        run: |
+          set -e
+          # Wait up to ~5 minutes (60 * 5s) for the LB to provision on first deploy
+          for i in {1..60}; do
+            HOSTNAME=$(kubectl get svc -n ingress-nginx ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' || true)
+            if [ -n "$HOSTNAME" ]; then
+              echo "LB_ENDPOINT=$HOSTNAME" >> $GITHUB_ENV
+              echo "Public Hostname: $HOSTNAME"
+              exit 0
+            fi
+            echo "Waiting for ingress-nginx controller hostname..."
+            sleep 5
+          done
+          echo "Ingress controller hostname not ready in time" >&2
+          exit 1
+
+      # (Optional) Wait for your certificate to be Ready (namespace/secretName must match your Ingress)
+      - name: Wait for TLS certificate (optional)
+        continue-on-error: true
+        run: |
+          # Adjust namespace/name if different
+          kubectl -n default wait --for=condition=Ready certificate/cpms-ui-tls --timeout=180s || true
+          kubectl -n default get certificate cpms-ui-tls || true
+
+      # Azure Login to update DNS
       - name: Azure Login
         uses: azure/login@v2
         with:
@@ -69,7 +106,7 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      # 7. Create/Update CNAME Record in Azure DNS
+      # Update CNAME to point to the Ingress controller LB
       - name: Create/Update Azure DNS CNAME Record
         env:
           AZURE_DNS_ZONE: "aakankshapharande.com"
