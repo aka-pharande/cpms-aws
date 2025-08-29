@@ -70,7 +70,7 @@ module "vpc" {
 }
 
 ############################################
-# Random passwords for RDS users
+# Random passwords
 ############################################
 resource "random_password" "rds_master" {
   length  = 24
@@ -79,6 +79,11 @@ resource "random_password" "rds_master" {
 
 resource "random_password" "rds_devuser" {
   length  = 24
+  special = false
+}
+
+resource "random_password" "jwt_secret" {
+  length  = 64
   special = false
 }
 
@@ -99,8 +104,8 @@ resource "aws_security_group" "rds" {
   }
 
   ingress {
-    from_port   = 3306
-    to_port     = 3306
+    from_port   = local.rds_dbport
+    to_port     = local.rds_dbport
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
@@ -171,11 +176,6 @@ module "eks" {
   subnet_ids               = module.vpc.private_subnets
   control_plane_subnet_ids = module.vpc.private_subnets
 
-  # compute_config = {
-  #   enabled    = true
-  #   node_pools = ["general-purpose", "system"]
-  # }
-
   addons = var.eks_addons
 
   eks_managed_node_groups = {
@@ -201,6 +201,7 @@ module "eks" {
     }
   }
 
+  # Adding myself as an admin for testing
   access_entries = {
     aakanksha-admin = {
       principal_arn = "arn:aws:iam::786193448664:user/aakankshaph"
@@ -218,20 +219,6 @@ module "eks" {
   tags = merge(var.tags, {
     Name = local.cluster_name
   })
-}
-
-############################################
-# Kubernetes provider (auth via aws eks get-token)
-############################################
-provider "kubernetes" {
-  host                   = module.eks.cluster_endpoint
-  cluster_ca_certificate = base64decode(module.eks.cluster_certificate_authority_data)
-
-  exec {
-    api_version = "client.authentication.k8s.io/v1beta1"
-    command     = "aws"
-    args        = ["eks", "get-token", "--cluster-name", module.eks.cluster_name]
-  }
 }
 
 ############################################
@@ -413,6 +400,17 @@ resource "kubernetes_service_account" "s3_reader" {
 ############################################
 # Kubernetes Secrets (DB creds + app secrets)
 ############################################
+provider "kubernetes" {
+  host                   = module.eks.cluster_endpoint
+  cluster_ca_certificate = base64decode(module.eks.cluster_certificate_authority_data)
+
+  exec {
+    api_version = "client.authentication.k8s.io/v1beta1"
+    command     = "aws"
+    args        = ["eks", "get-token", "--cluster-name", module.eks.cluster_name]
+  }
+}
+
 resource "kubernetes_secret" "cpms_db_admin" {
   depends_on = [module.eks]
 
@@ -489,7 +487,7 @@ resource "kubernetes_secret" "cpms_auth_secret" {
   }
 
   data = {
-    JWT_SECRET = "4898b1d752b01754c0c0cafd345f8e0cddfb148d0660e65dfe328e84053d2154154d886eb85dd8d90c93d35ddaef2710b5806b94f5dd9bfc1bea73489db0c7dd"
+    JWT_SECRET = random_password.jwt_secret.result
   }
 
   type = "Opaque"
