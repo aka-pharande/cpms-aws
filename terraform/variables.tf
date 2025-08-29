@@ -99,7 +99,7 @@ variable "node_max_size" {
 variable "node_desired_size" {
   description = "Desired number of nodes in the EKS node group"
   type        = number
-  default     = 4
+  default     = 8
   
   validation {
     condition     = var.node_desired_size >= var.node_min_size && var.node_desired_size <= var.node_max_size
