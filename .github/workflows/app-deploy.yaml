@@ -95,7 +95,7 @@ jobs:
         continue-on-error: true
         run: |
           # Adjust namespace/name if different
-          kubectl -n default wait --for=condition=Ready certificate/cpms-ui-tls --timeout=180s || true
+          kubectl -n default wait --for=condition=Ready certificate/cpms-ui-tls --timeout=500s || true
           kubectl -n default get certificate cpms-ui-tls || true
 
       # Azure Login to update DNS
