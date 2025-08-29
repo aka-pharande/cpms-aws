@@ -288,6 +288,20 @@ resource "aws_s3_bucket_public_access_block" "docs" {
   restrict_public_buckets = true
 }
 
+resource "aws_s3_bucket_cors_configuration" "docs" {
+  bucket = aws_s3_bucket.docs.id
+
+  cors_rule {
+    id = "cpms-docs-cors"
+    allowed_methods = ["PUT", "GET", "HEAD"]
+    allowed_headers = ["*"]
+    allowed_origins = ["http://cpms.aakankshapharande.com", "http://localhost"]
+    expose_headers  = ["ETag"]
+    max_age_seconds = 3000
+  }
+}
+
+
 # IRSA trust policy (restrict to one SA + audience)
 data "aws_iam_policy_document" "s3_irsa_assume_role" {
   statement {
