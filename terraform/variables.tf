@@ -71,7 +71,7 @@ variable "kubernetes_version" {
 variable "node_instance_types" {
   description = "EC2 instance types for EKS nodes"
   type        = list(string)
-  default     = ["t3.large"]
+  default     = ["t3.xlarge"]
 }
 
 variable "node_min_size" {
@@ -99,7 +99,7 @@ variable "node_max_size" {
 variable "node_desired_size" {
   description = "Desired number of nodes in the EKS node group"
   type        = number
-  default     = 2
+  default     = 1
   
   validation {
     condition     = var.node_desired_size >= var.node_min_size && var.node_desired_size <= var.node_max_size
