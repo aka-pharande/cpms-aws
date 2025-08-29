@@ -656,3 +656,166 @@ resource "kubernetes_job_v1" "database_init" {
     }
   }
 }
+
+############################################
+# Providers (Helm wired to your EKS cluster)
+############################################
+# You already have a kubernetes provider; this Helm provider mirrors it.
+provider "helm" {
+  kubernetes {
+    host                   = module.eks.cluster_endpoint
+    cluster_ca_certificate = base64decode(module.eks.cluster_certificate_authority_data)
+
+    exec {
+      api_version = "client.authentication.k8s.io/v1beta1"
+      command     = "aws"
+      args        = ["eks", "get-token", "--cluster-name", module.eks.cluster_name]
+    }
+  }
+}
+
+############################################
+# (Optional) Versions & small config
+############################################
+variable "acme_email" {
+  description = "Email for Let's Encrypt registration/expiry notices"
+  type        = string
+}
+
+locals {
+  ingress_nginx_chart_version = "4.11.3" # update as desired
+  cert_manager_chart_version  = "v1.14.4" # chart app version
+}
+
+############################################
+# Namespaces
+############################################
+resource "kubernetes_namespace" "ingress_nginx" {
+  metadata {
+    name = "ingress-nginx"
+    labels = {
+      "app.kubernetes.io/name" = "ingress-nginx"
+    }
+  }
+}
+
+resource "kubernetes_namespace" "cert_manager" {
+  metadata {
+    name = "cert-manager"
+    labels = {
+      "app.kubernetes.io/name" = "cert-manager"
+    }
+  }
+}
+
+############################################
+# ingress-nginx (Helm)
+############################################
+resource "helm_release" "ingress_nginx" {
+  name       = "ingress-nginx"
+  namespace  = kubernetes_namespace.ingress_nginx.metadata[0].name
+  repository = "https://kubernetes.github.io/ingress-nginx"
+  chart      = "ingress-nginx"
+  version    = local.ingress_nginx_chart_version
+
+  # Basic, production-sane defaults
+  values = [
+    yamlencode({
+      controller = {
+        replicaCount = 2
+        service = {
+          type = "LoadBalancer"
+        }
+        # Watch all namespaces (empty string)
+        watchNamespace = ""
+        resources = {
+          requests = {
+            cpu    = "100m"
+            memory = "128Mi"
+          }
+        }
+      }
+    })
+  ]
+
+  timeout  = 600
+  wait     = true
+  cleanup_on_fail = true
+}
+
+############################################
+# cert-manager (Helm) - install CRDs too
+############################################
+resource "helm_release" "cert_manager" {
+  name       = "cert-manager"
+  namespace  = kubernetes_namespace.cert_manager.metadata[0].name
+  repository = "https://charts.jetstack.io"
+  chart      = "cert-manager"
+  version    = local.cert_manager_chart_version
+
+  # Equivalent to: set { name = "installCRDs" value = "true" }
+  values = [
+    yamlencode({
+      installCRDs = true
+    })
+  ]
+
+  timeout        = 600
+  wait           = true
+  cleanup_on_fail = true
+}
+
+
+############################################
+# Let’s Encrypt ClusterIssuers (prod + staging)
+# Requires cert-manager CRDs -> depend on Helm release
+############################################
+resource "kubernetes_manifest" "le_issuers" {
+  depends_on = [helm_release.cert_manager]
+
+  manifest = {
+    apiVersion = "v1"
+    kind       = "List"
+    items = [
+      {
+        apiVersion = "cert-manager.io/v1"
+        kind       = "ClusterIssuer"
+        metadata   = { name = "letsencrypt-staging" }
+        spec = {
+          acme = {
+            server   = "https://acme-staging-v02.api.letsencrypt.org/directory"
+            email    = var.acme_email
+            privateKeySecretRef = { name = "le-staging-account-key" }
+            solvers = [
+              {
+                http01 = {
+                  ingress = { class = "nginx" }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        apiVersion = "cert-manager.io/v1"
+        kind       = "ClusterIssuer"
+        metadata   = { name = "letsencrypt-prod" }
+        spec = {
+          acme = {
+            server   = "https://acme-v02.api.letsencrypt.org/directory"
+            email    = var.acme_email
+            privateKeySecretRef = { name = "le-prod-account-key" }
+            solvers = [
+              {
+                http01 = {
+                  ingress = { class = "nginx" }
+                }
+              }
+            ]
+          }
+        }
+      }
+    ]
+  }
+}
+
