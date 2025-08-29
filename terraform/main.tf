@@ -145,6 +145,7 @@ module "db" {
   multi_az            = false
   monitoring_interval = 0
   publicly_accessible = true
+  skip_final_snapshot = true 
   deletion_protection = false
 
   vpc_security_group_ids = [aws_security_group.rds.id]
@@ -242,7 +243,7 @@ locals {
 # S3 bucket (private, versioned, SSE, public blocked)
 resource "aws_s3_bucket" "docs" {
   bucket        = local.s3_bucket_name
-  force_destroy = false
+  force_destroy = true
   tags          = merge(var.tags, { Name = local.s3_bucket_name })
 }
 
