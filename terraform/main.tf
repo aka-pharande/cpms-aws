@@ -283,7 +283,7 @@ resource "aws_s3_bucket_cors_configuration" "docs" {
     id = "cpms-docs-cors"
     allowed_methods = ["PUT", "GET", "HEAD"]
     allowed_headers = ["*"]
-    allowed_origins = ["http://cpms.aakankshapharande.com", "http://localhost"]
+    allowed_origins = ["https://cpms.aakankshapharande.com", "http://cpms.aakankshapharande.com", "http://localhost"]
     expose_headers  = ["ETag"]
     max_age_seconds = 3000
   }
