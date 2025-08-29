@@ -674,14 +674,6 @@ provider "helm" {
   }
 }
 
-############################################
-# (Optional) Versions & small config
-############################################
-variable "acme_email" {
-  description = "Email for Let's Encrypt registration/expiry notices"
-  type        = string
-}
-
 locals {
   ingress_nginx_chart_version = "4.11.3" # update as desired
   cert_manager_chart_version  = "v1.14.4" # chart app version

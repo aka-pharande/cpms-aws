@@ -212,3 +212,9 @@ variable "tags" {
     Product     = "migrator"
   }
 }
+
+variable "acme_email" {
+  description = "Email for Let's Encrypt registration/expiry notices"
+  type        = string
+  default     = "aka.pharande@gmail.com"
+}
