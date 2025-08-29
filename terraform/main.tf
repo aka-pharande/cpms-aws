@@ -89,6 +89,13 @@ resource "aws_security_group" "rds" {
     security_groups  = [module.eks.cluster_primary_security_group_id]
   }
 
+  ingress {
+    from_port        = 0
+    to_port          = 0
+    protocol         = "mysql/aurora"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
   egress {
     from_port   = 0
     to_port     = 0
