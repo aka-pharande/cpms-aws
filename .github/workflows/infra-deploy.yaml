@@ -31,7 +31,14 @@ jobs:
 
       - name: Terraform Init
         working-directory: terraform
-        run: terraform init
+        run: terraform init -upgrade -reconfigure
+
+      - name: Show provider versions
+        working-directory: terraform
+        run: |
+          terraform providers
+          echo "---- helm in lockfile ----"
+          grep -A3 '"hashicorp/helm"' .terraform.lock.hcl || true
 
       - name: Terraform Validate
         working-directory: terraform
