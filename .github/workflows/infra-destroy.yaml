@@ -22,6 +22,33 @@ jobs:
           role-to-assume: arn:aws:iam::786193448664:role/github.cpms.admin
           aws-region: us-east-1
 
+      - name: Download Terraform Outputs from S3
+        run: |
+          mkdir -p tf-outputs
+          aws s3 cp s3://s3-cpms-state-dev-useast1/cpms/tf_outputs.json tf-outputs/tf_outputs.json
+
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      - name: Parse Terraform Outputs
+        id: parse
+        run: |
+          CLUSTER_NAME=$(jq -r '.eks_cluster_name.value' tf-outputs/tf_outputs.json)
+          REGION=$(jq -r '.eks_cluster_region.value' tf-outputs/tf_outputs.json)
+          echo "CLUSTER_NAME=$CLUSTER_NAME" >> $GITHUB_ENV
+          echo "REGION=$REGION" >> $GITHUB_ENV
+
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: 'latest'
+
+      - name: Update kubeconfig
+        run: aws eks --region $REGION update-kubeconfig --name $CLUSTER_NAME
+
+      - name: Deploy k8s Manifests
+        run: kubectl delete -f k8s/
+
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
 

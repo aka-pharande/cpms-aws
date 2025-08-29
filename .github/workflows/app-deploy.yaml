@@ -53,7 +53,6 @@ jobs:
       - name: Deploy k8s Manifests
         run: kubectl apply -f k8s/
 
-      # ---------- Option C: Apply ClusterIssuers via kubectl ----------
       # Requires a file k8s/le-cluster-issuers.yaml with REPLACE_ME_EMAIL placeholder
       - name: Apply ClusterIssuers (optional)
         if: ${{ hashFiles('k8s/le-cluster-issuers.yaml') != '' }}
@@ -90,7 +89,6 @@ jobs:
           echo "Ingress controller hostname not ready in time" >&2
           exit 1
 
-      # (Optional) Wait for your certificate to be Ready (namespace/secretName must match your Ingress)
       - name: Wait for TLS certificate (optional)
         continue-on-error: true
         run: |
